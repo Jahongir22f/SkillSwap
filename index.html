@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkillSwap Marketplace - Exchange Skills</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); }
+        .skill-chip { transition: all 0.2s; cursor: pointer; }
+        .skill-chip:hover { transform: translateY(-2px); }
+        .skill-chip.selected { background-color: #4f46e5; color: white; border-color: #4f46e5; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .tab-active { color: #4f46e5; background-color: #eef2ff; border-radius: 1rem; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+        
+        /* Floating Smooth Transition */
+        .view-section {
+            transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: top;
+        }
+        .view-hidden {
+            opacity: 0;
+            transform: translateY(20px) scale(0.98);
+            pointer-events: none;
+            position: absolute;
+            width: 100%;
+        }
+        .view-visible {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+            position: relative;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900">
+
+    <!-- Video Call Modal -->
+    <div id="video-call-modal" class="hidden fixed inset-0 z-[300] bg-slate-900 flex flex-col items-center justify-center">
+        <div class="absolute inset-0 overflow-hidden">
+            <img id="call-bg" src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=1000" class="w-full h-full object-cover blur-2xl opacity-30">
+        </div>
+        
+        <div class="relative z-10 flex flex-col items-center text-center">
+            <div class="w-40 h-40 bg-indigo-600 rounded-[3rem] border-8 border-slate-800 shadow-2xl flex items-center justify-center text-white text-6xl font-black mb-8 overflow-hidden" id="call-avatar">
+                A
+            </div>
+            <h3 class="text-4xl font-black text-white mb-2" id="call-name">Alex Johnson</h3>
+            <p class="text-indigo-400 font-bold animate-pulse text-xl" id="call-status">Calling...</p>
+        </div>
+
+        <div class="relative z-10 mt-20 flex space-x-8">
+            <button onclick="endVideoCall()" class="w-20 h-20 bg-rose-600 text-white rounded-full flex items-center justify-center shadow-2xl hover:bg-rose-700 transition-all hover:scale-110">
+                <i data-lucide="phone-off" size="32"></i>
+            </button>
+            <button class="w-20 h-20 bg-slate-800 text-white rounded-full flex items-center justify-center shadow-2xl hover:bg-slate-700 transition-all">
+                <i data-lucide="mic" size="32"></i>
+            </button>
+            <button class="w-20 h-20 bg-slate-800 text-white rounded-full flex items-center justify-center shadow-2xl hover:bg-slate-700 transition-all">
+                <i data-lucide="video" size="32"></i>
+            </button>
+        </div>
+
+        <!-- Self View -->
+        <div class="absolute bottom-10 right-10 w-48 h-64 bg-slate-800 rounded-3xl border-4 border-slate-700 shadow-2xl overflow-hidden z-20">
+            <img src="https://i.pravatar.cc/150?u=me" class="w-full h-full object-cover">
+            <div class="absolute top-4 left-4 bg-black/40 px-2 py-1 rounded-lg text-[10px] text-white font-bold backdrop-blur-md">You</div>
+        </div>
+    </div>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="hidden fixed inset-0 z-[200] flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="toggleAuthModal()"></div>
+        <div class="relative bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-fade">
+            <div id="login-form">
+                <h3 class="text-3xl font-extrabold mb-2">Welcome Back</h3>
+                <p class="text-slate-500 mb-8">Login to start swapping skills.</p>
+                <div class="space-y-4">
+                    <input type="email" id="login-email" placeholder="Email Address" class="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-100 outline-none">
+                    <input type="password" id="login-password" placeholder="Password" class="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-100 outline-none">
+                    <button onclick="handleLogin('login')" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">Login</button>
+                </div>
+                <p class="mt-6 text-center text-slate-500 text-sm">Don't have an account? <a href="javascript:void(0)" onclick="toggleAuthType()" class="text-indigo-600 font-bold">Register</a></p>
+            </div>
+            <div id="register-form" class="hidden">
+                <h3 class="text-3xl font-extrabold mb-2">Join SkillSwap</h3>
+                <p class="text-slate-500 mb-8">Create an account to join the community.</p>
+                <div class="space-y-4">
+                    <input type="text" id="reg-name" placeholder="Full Name" class="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-100 outline-none">
+                    <input type="email" id="reg-email" placeholder="Email Address" class="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-100 outline-none">
+                    <input type="password" id="reg-password" placeholder="Password" class="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-100 outline-none">
+                    <button onclick="handleLogin('register')" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">Create Account</button>
+                </div>
+                <p class="mt-6 text-center text-slate-500 text-sm">Already have an account? <a href="javascript:void(0)" onclick="toggleAuthType()" class="text-indigo-600 font-bold">Login</a></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Onboarding Modal -->
+    <div id="onboarding-modal" class="hidden fixed inset-0 z-[250] flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-md"></div>
+        <div class="relative bg-white w-full max-w-2xl rounded-[3rem] p-12 shadow-2xl animate-fade">
+            <!-- Step 1: Skills I Offer -->
+            <div id="onboarding-step-1">
+                <h3 class="text-4xl font-black mb-4">What can you teach?</h3>
+                <p class="text-slate-500 mb-8 text-lg">Select at least 2 skills you are proficient in.</p>
+                <div class="flex flex-wrap gap-3 mb-10 max-h-64 overflow-y-auto p-2" id="offer-skills-list">
+                    <!-- Skills will be injected here -->
+                </div>
+                <button onclick="nextOnboardingStep(2)" class="w-full bg-indigo-600 text-white py-5 rounded-2xl font-bold text-xl hover:bg-indigo-700 shadow-xl shadow-indigo-100">Continue</button>
+            </div>
+            <!-- Step 2: Skills I Want -->
+            <div id="onboarding-step-2" class="hidden">
+                <h3 class="text-4xl font-black mb-4">What do you want to learn?</h3>
+                <p class="text-slate-500 mb-8 text-lg">Select skills you'd like to acquire.</p>
+                <div class="flex flex-wrap gap-3 mb-10 max-h-64 overflow-y-auto p-2" id="want-skills-list">
+                    <!-- Skills will be injected here -->
+                </div>
+                <div class="flex gap-4">
+                    <button onclick="nextOnboardingStep(1)" class="flex-1 bg-slate-100 text-slate-600 py-5 rounded-2xl font-bold text-xl">Back</button>
+                    <button onclick="finishOnboarding()" class="flex-[2] bg-indigo-600 text-white py-5 rounded-2xl font-bold text-xl hover:bg-indigo-700 shadow-xl shadow-indigo-100">Finish & Start Swapping</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Profile Modal -->
+    <div id="edit-profile-modal" class="hidden fixed inset-0 z-[200] flex items-center justify-center px-4">
+        <div class="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="toggleEditProfileModal()"></div>
+        <div class="relative bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl animate-fade">
+            <h3 class="text-3xl font-extrabold mb-6">Edit Profile</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Full Name</label>
+                    <input type="text" id="edit-name" class="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-100 outline-none">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-400 uppercase tracking-widest mb-2">Bio</label>
+                    <textarea id="edit-bio" class="w-full px-6 py-4 rounded-2xl border border-slate-200 focus:ring-2 focus:ring-indigo-100 outline-none h-32"></textarea>
+                </div>
+                <button onclick="saveProfile()" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav id="landing-nav" class="fixed top-0 w-full z-50 border-b border-slate-200 glass px-6 py-4">
+        <div class="max-w-7xl mx-auto flex justify-between items-center">
+            <div class="flex items-center space-x-2 cursor-pointer" onclick="location.reload()">
+                <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
+                    <i data-lucide="zap" class="fill-current"></i>
+                </div>
+                <span class="text-2xl font-extrabold tracking-tight text-indigo-600">SkillSwap</span>
+            </div>
+            <div class="hidden md:flex items-center space-x-8 font-semibold text-slate-600">
+                <a href="#explore-section" class="hover:text-indigo-600 transition-colors" data-i18n="nav_explore">Explore</a>
+                <a href="#how-it-works-section" class="hover:text-indigo-600 transition-colors" data-i18n="nav_how">How it Works</a>
+                <a href="#contact-section" class="hover:text-indigo-600 transition-colors" data-i18n="nav_contact">Contact</a>
+            </div>
+            <div class="flex items-center space-x-4">
+                <!-- Language Selector -->
+                <div class="relative group">
+                    <button class="flex items-center space-x-2 bg-slate-100 px-3 py-2 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-200 transition-all">
+                        <i data-lucide="languages" size="16"></i>
+                        <span id="current-lang">ENG</span>
+                    </button>
+                    <div class="absolute right-0 mt-2 w-32 bg-white rounded-2xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[150] p-2">
+                        <button onclick="setLanguage('en')" class="w-full text-left px-4 py-2 hover:bg-indigo-50 rounded-xl text-sm font-bold transition-colors">English</button>
+                        <button onclick="setLanguage('ru')" class="w-full text-left px-4 py-2 hover:bg-indigo-50 rounded-xl text-sm font-bold transition-colors">Русский</button>
+                        <button onclick="setLanguage('uz')" class="w-full text-left px-4 py-2 hover:bg-indigo-50 rounded-xl text-sm font-bold transition-colors">O'zbekcha</button>
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="toggleAuthModal('login')" class="text-slate-600 font-bold px-4 py-2.5" data-i18n="btn_login">Login</button>
+                    <button onclick="toggleAuthModal('register')" class="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100" data-i18n="btn_signup">
+                        Sign Up Free
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Landing Page Content -->
+    <div id="landing-page" class="pt-32">
+        <!-- Hero Section -->
+        <section class="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-center pb-32">
+            <div class="animate-fade">
+                <div class="inline-flex items-center space-x-2 bg-indigo-50 text-indigo-700 px-4 py-1.5 rounded-full text-sm font-bold mb-6">
+                    <i data-lucide="award" size="16" class="mr-1"></i> Global Skill Barter Network
+                </div>
+                <h1 class="text-6xl md:text-7xl font-extrabold leading-[1.1] mb-8" data-i18n="hero_title">
+                    Teach Skills. <br><span class="text-indigo-600">Earn Credits.</span> <br>Learn Free.
+                </h1>
+                <p class="text-xl text-slate-500 mb-10 leading-relaxed max-w-lg" data-i18n="hero_desc">
+                    The modern way to upgrade your career without spending a dime. Swap expertise with people worldwide using our credit system.
+                </p>
+                <div class="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
+                    <button onclick="toggleAuthModal('register')" class="bg-indigo-600 text-white px-10 py-5 rounded-2xl text-xl font-bold hover:bg-indigo-700 shadow-xl shadow-indigo-100 transition-all transform hover:-translate-y-1" data-i18n="get_started">
+                        Start Your Journey
+                    </button>
+                    <a href="#how-it-works-section" class="bg-white border-2 border-slate-100 px-10 py-5 rounded-2xl text-xl font-bold hover:bg-slate-50 transition-all text-center">How it Works</a>
+                </div>
+            </div>
+            <div class="relative animate-fade" style="animation-delay: 0.2s">
+                <div class="bg-indigo-600 rounded-[4rem] aspect-square overflow-hidden shadow-2xl relative">
+                    <img src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&q=80&w=1000" class="w-full h-full object-cover opacity-80">
+                </div>
+                <div class="absolute -bottom-10 -left-10 bg-white p-6 rounded-3xl shadow-2xl border border-slate-50 max-w-xs">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-12 h-12 bg-emerald-100 rounded-2xl flex items-center justify-center text-emerald-600">
+                            <i data-lucide="check-circle"></i>
+                        </div>
+                        <div>
+                            <p class="font-bold">Malika matched!</p>
+                            <p class="text-sm text-slate-500">UX Design &bull; Python</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- How It Works Section -->
+        <section id="how-it-works-section" class="bg-white py-32 border-y border-slate-100">
+            <div class="max-w-7xl mx-auto px-6 text-center">
+                <h2 class="text-4xl md:text-5xl font-black mb-6" data-i18n="how_title">How SkillSwap Works</h2>
+                <p class="text-slate-500 text-xl max-w-2xl mx-auto mb-20" data-i18n="how_subtitle">A detailed guide to your first successful knowledge exchange.</p>
+                
+                <div class="grid md:grid-cols-3 gap-12">
+                    <!-- Step 1 -->
+                    <div class="p-10 rounded-[3rem] bg-slate-50 hover:bg-indigo-50 transition-all group relative overflow-hidden">
+                        <div class="absolute top-4 right-8 text-8xl font-black text-slate-100 group-hover:text-indigo-100 transition-colors">01</div>
+                        <div class="relative z-10">
+                            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mb-8 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                <i data-lucide="user-plus" size="32"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-4" data-i18n="step1_title">1. Personalize Profile</h3>
+                            <p class="text-slate-500 leading-relaxed" data-i18n="step1_desc">Sign up and list the specific skills you can teach (e.g., Python, Piano) and what you want to learn. Add a bio to build trust within the community.</p>
+                        </div>
+                    </div>
+                    <!-- Step 2 -->
+                    <div class="p-10 rounded-[3rem] bg-slate-50 hover:bg-indigo-50 transition-all group relative overflow-hidden">
+                        <div class="absolute top-4 right-8 text-8xl font-black text-slate-100 group-hover:text-indigo-100 transition-colors">02</div>
+                        <div class="relative z-10">
+                            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mb-8 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                <i data-lucide="search" size="32"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-4" data-i18n="step2_title">2. Smart Matching</h3>
+                            <p class="text-slate-500 leading-relaxed" data-i18n="step2_desc">Our algorithm calculates compatibility scores based on your needs. Browse 30+ experts, check their ratings, and send a swap proposal via real-time chat.</p>
+                        </div>
+                    </div>
+                    <!-- Step 3 -->
+                    <div class="p-10 rounded-[3rem] bg-slate-50 hover:bg-indigo-50 transition-all group relative overflow-hidden">
+                        <div class="absolute top-4 right-8 text-8xl font-black text-slate-100 group-hover:text-indigo-100 transition-colors">03</div>
+                        <div class="relative z-10">
+                            <div class="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mb-8 group-hover:bg-indigo-600 group-hover:text-white transition-all">
+                                <i data-lucide="video" size="32"></i>
+                            </div>
+                            <h3 class="text-2xl font-bold mb-4" data-i18n="step3_title">3. Swap & Earn</h3>
+                            <p class="text-slate-500 leading-relaxed" data-i18n="step3_desc">Schedule a video session. For every 60 minutes you teach, you earn 1 credit. Spend your credits to learn any new skill from the global network.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Explore Section -->
+        <section id="explore-section" class="py-32">
+            <div class="max-w-7xl mx-auto px-6">
+                <div class="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
+                    <div>
+                        <h2 class="text-4xl md:text-5xl font-black mb-6" data-i18n="explore_title">Explore Skills</h2>
+                        <p class="text-slate-500 text-xl max-w-xl" data-i18n="explore_subtitle">From Programming to Public Speaking, find anything you want to learn.</p>
+                    </div>
+                    <button onclick="toggleAuthModal('register')" class="bg-indigo-600 text-white px-8 py-4 rounded-2xl font-bold hover:bg-indigo-700 transition-all" data-i18n="view_all">View All 50+ Skills</button>
+                </div>
+                
+                <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4" id="skill-explore-grid">
+                    <!-- Skills will be auto-generated -->
+                </div>
+            </div>
+        </section>
+
+        <!-- Contact Section -->
+        <section id="contact-section" class="bg-indigo-600 py-32 rounded-[4rem] mx-6 mb-20 text-white overflow-hidden relative">
+            <div class="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full translate-x-32 -translate-y-32"></div>
+            <div class="max-w-7xl mx-auto px-12 relative z-10 grid md:grid-cols-2 gap-20 items-center">
+                <div>
+                    <h2 class="text-5xl font-black mb-8" data-i18n="contact_title">Get in Touch</h2>
+                    <p class="text-indigo-100 text-xl mb-12 leading-relaxed" data-i18n="contact_subtitle">Have questions? Our team is here to help you start your skill swap journey today.</p>
+                    <div class="space-y-6">
+                        <div class="flex items-center space-x-4"><i data-lucide="mail"></i> <span class="font-bold">support@skillswap.com</span></div>
+                        <div class="flex items-center space-x-4"><i data-lucide="map-pin"></i> <span class="font-bold" data-i18n="contact_loc">Tashkent IT Park, Uzbekistan</span></div>
+                    </div>
+                </div>
+                <div class="bg-white p-10 rounded-[3rem] text-slate-900 shadow-2xl">
+                    <div class="space-y-4">
+                        <input type="text" placeholder="Your Name" class="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none focus:ring-2 focus:ring-indigo-100" data-i18n-placeholder="form_name">
+                        <input type="email" placeholder="Email Address" class="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none focus:ring-2 focus:ring-indigo-100" data-i18n-placeholder="form_email">
+                        <textarea placeholder="Message" class="w-full px-6 py-4 rounded-2xl bg-slate-50 border border-slate-100 outline-none focus:ring-2 focus:ring-indigo-100 h-32" data-i18n-placeholder="form_msg"></textarea>
+                        <button class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold hover:bg-indigo-700 transition-all" data-i18n="btn_send">Send Message</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="max-w-7xl mx-auto px-6 py-12 border-t border-slate-200 flex flex-col md:flex-row justify-between items-center text-slate-400 gap-6">
+            <div class="flex items-center space-x-2 text-indigo-600">
+                <i data-lucide="zap" class="fill-current"></i>
+                <span class="text-2xl font-black">SkillSwap</span>
+            </div>
+            <p class="font-bold">© 2026 SkillSwap Marketplace. All rights reserved.</p>
+            <div class="flex space-x-8 font-bold">
+                <a href="#" class="hover:text-indigo-600">Privacy</a>
+                <a href="#" class="hover:text-indigo-600">Terms</a>
+            </div>
+        </footer>
+    </div>
+
+    <!-- App Dashboard -->
+    <div id="app-dashboard" class="hidden fixed inset-0 z-[100] bg-slate-50 overflow-y-auto">
+        <nav class="fixed bottom-0 md:left-0 md:top-0 md:h-full w-full md:w-24 bg-white border-t md:border-t-0 md:border-r border-slate-200 z-[110] flex md:flex-col justify-around md:justify-center items-center py-4 md:space-y-12 shadow-xl">
+            <div class="hidden md:flex flex-col items-center space-y-8 mb-auto">
+                <div class="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white mb-8 cursor-pointer" onclick="location.reload()">
+                    <i data-lucide="zap" class="fill-current"></i>
+                </div>
+                
+                <!-- Dashboard Language Selector -->
+                <div class="relative group">
+                    <button class="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-600 hover:bg-slate-200 transition-all">
+                        <i data-lucide="languages" size="20"></i>
+                    </button>
+                    <div class="absolute left-full ml-4 top-0 w-32 bg-white rounded-2xl shadow-xl border border-slate-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[150] p-2">
+                        <button onclick="setLanguage('en')" class="w-full text-left px-4 py-2 hover:bg-indigo-50 rounded-xl text-sm font-bold transition-colors">English</button>
+                        <button onclick="setLanguage('ru')" class="w-full text-left px-4 py-2 hover:bg-indigo-50 rounded-xl text-sm font-bold transition-colors">Русский</button>
+                        <button onclick="setLanguage('uz')" class="w-full text-left px-4 py-2 hover:bg-indigo-50 rounded-xl text-sm font-bold transition-colors">O'zbekcha</button>
+                    </div>
+                </div>
+            </div>
+
+            <button onclick="switchTab('home')" id="btn-home" class="p-4 tab-active transition-all"><i data-lucide="home"></i></button>
+            <button onclick="switchTab('chat')" id="btn-chat" class="p-4 text-slate-400 hover:text-indigo-600 transition-all"><i data-lucide="message-square"></i></button>
+            <button onclick="switchTab('wallet')" id="btn-wallet" class="p-4 text-slate-400 hover:text-indigo-600 transition-all"><i data-lucide="wallet"></i></button>
+            <button onclick="switchTab('profile')" id="btn-profile" class="p-4 text-slate-400 hover:text-indigo-600 transition-all"><i data-lucide="user"></i></button>
+            
+            <div class="md:hidden">
+                <button class="p-4 text-slate-400 hover:text-indigo-600 transition-all">
+                    <i data-lucide="languages" size="20"></i>
+                </button>
+            </div>
+
+            <button onclick="location.reload()" class="hidden md:flex p-4 text-slate-400 hover:text-rose-600 transition-all mt-auto"><i data-lucide="log-out"></i></button>
+        </nav>
+
+        <main class="md:ml-24 p-6 md:p-12 pb-32">
+            <div class="max-w-6xl mx-auto relative min-h-[80vh]">
+                <!-- Views -->
+                <div id="view-container">
+                    <!-- Home View -->
+                    <div id="home-view" class="view-section view-visible">
+                        <header class="flex justify-between items-center mb-12">
+                            <div>
+                                <h2 class="text-4xl font-extrabold mb-2" data-i18n="recommended_title">Recommended Experts</h2>
+                                <p class="text-slate-500" data-i18n="recommended_subtitle">Hand-picked matches for your interests.</p>
+                            </div>
+                            <div class="flex items-center space-x-4 bg-white p-2 pr-6 rounded-3xl shadow-sm border border-slate-100">
+                                <img src="https://i.pravatar.cc/150?u=me" id="user-avatar-top" class="w-12 h-12 rounded-2xl shadow-inner">
+                                <div>
+                                    <p class="text-xs font-bold text-slate-400 uppercase tracking-widest" data-i18n="balance_label">Balance</p>
+                                    <p class="text-lg font-extrabold text-indigo-600">1.50 Credits</p>
+                                </div>
+                            </div>
+                        </header>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8" id="expert-grid">
+                            <!-- Experts will be injected here by JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- Profile View -->
+                    <div id="profile-view" class="view-section view-hidden max-w-4xl mx-auto">
+                        <div class="bg-white rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden">
+                            <div class="h-48 bg-gradient-to-r from-indigo-600 to-purple-700 relative"></div>
+                            <div class="px-12 pb-12 -mt-20 relative">
+                                <div class="flex flex-col md:flex-row items-end gap-8 mb-12">
+                                    <div class="relative group cursor-pointer" onclick="changeProfilePic()">
+                                        <img src="https://i.pravatar.cc/150?u=me" id="profile-img" class="w-40 h-40 rounded-[2.5rem] border-8 border-white shadow-2xl transition-all group-hover:brightness-50">
+                                        <div class="absolute inset-0 flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <i data-lucide="camera" size="32"></i>
+                                        </div>
+                                    </div>
+                                    <div class="pb-4">
+                                        <h2 class="text-4xl font-black" id="profile-name-display">Azamat Ismatov</h2>
+                                        <p class="text-slate-400 font-bold flex items-center mt-2" id="profile-tagline"><i data-lucide="map-pin" size="16" class="mr-2"></i> Product Designer &bull; Tashkent</p>
+                                    </div>
+                                    <button onclick="toggleEditProfileModal()" class="md:ml-auto mb-4 bg-slate-50 border border-slate-200 px-6 py-3 rounded-2xl font-bold flex items-center hover:bg-slate-100 transition-all">
+                                        <i data-lucide="edit-3" size="18" class="mr-2"></i> <span data-i18n="edit_profile">Edit Profile</span>
+                                    </button>
+                                </div>
+                                <div class="grid md:grid-cols-2 gap-12">
+                                    <div class="space-y-8">
+                                        <div>
+                                            <h4 class="text-lg font-black mb-4" data-i18n="about_me">About Me</h4>
+                                            <p class="text-slate-500 leading-relaxed bg-slate-50 p-6 rounded-3xl" id="profile-bio-display">Passionate about building intuitive digital products. I love sharing my UI/UX knowledge and want to learn Python to automate my workflows.</p>
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-6">
+                                            <div>
+                                                <h4 class="text-xs font-black text-slate-400 uppercase mb-3" data-i18n="teaching_label">Teaching</h4>
+                                                <div class="flex flex-wrap gap-2" id="profile-teaching-skills">
+                                                    <!-- Dynamic -->
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <h4 class="text-xs font-black text-slate-400 uppercase mb-3" data-i18n="learning_label">Learning</h4>
+                                                <div class="flex flex-wrap gap-2" id="profile-learning-skills">
+                                                    <!-- Dynamic -->
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="bg-indigo-600 rounded-[2.5rem] p-8 text-white">
+                                        <h4 class="text-xl font-bold mb-4" data-i18n="skill_stats">Skill Stats</h4>
+                                        <div class="space-y-6">
+                                            <div class="flex justify-between items-center"><span data-i18n="sessions_done">Sessions Completed</span><span class="font-black text-2xl">0</span></div>
+                                            <div class="flex justify-between items-center"><span data-i18n="avg_rating">Average Rating</span><span class="font-black text-2xl flex items-center">5.0 <i data-lucide="star" class="fill-current ml-1" size="20"></i></span></div>
+                                            <div class="flex justify-between items-center"><span data-i18n="resp_rate">Response Rate</span><span class="font-black text-2xl">100%</span></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Chat View -->
+                    <div id="chat-view" class="view-section view-hidden h-[75vh]">
+                        <div class="bg-white h-full rounded-[3rem] shadow-sm border border-slate-100 overflow-hidden flex">
+                            <!-- Chat Sidebar -->
+                            <div class="w-full md:w-80 border-r border-slate-100 flex flex-col">
+                                <div class="p-8 border-b border-slate-50">
+                                    <h3 class="text-2xl font-extrabold" data-i18n="messages_title">Messages</h3>
+                                </div>
+                                <div class="flex-grow overflow-y-auto p-4 space-y-2" id="chat-list">
+                                    <div class="p-20 text-center opacity-50">
+                                        <i data-lucide="message-square" size="48" class="mx-auto mb-4"></i>
+                                        <p class="font-bold" data-i18n="no_chats">No chats active</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- Chat Main -->
+                            <div class="hidden md:flex flex-grow bg-slate-50/50 flex-col" id="chat-main">
+                                <div id="chat-empty" class="flex-grow flex flex-col items-center justify-center text-slate-400">
+                                    <i data-lucide="zap" size="64" class="mb-4 opacity-20"></i>
+                                    <p class="font-bold" data-i18n="select_contact">Select a contact to start swapping</p>
+                                </div>
+                                <div id="chat-active" class="hidden flex-grow flex flex-col h-full overflow-hidden">
+                                    <!-- Chat Header -->
+                                    <div class="p-6 bg-white border-b border-slate-100 flex justify-between items-center">
+                                        <div class="flex items-center space-x-4">
+                                            <div id="active-chat-avatar" class="w-12 h-12 bg-indigo-100 rounded-2xl flex items-center justify-center font-bold text-indigo-700">A</div>
+                                            <div>
+                                                <h4 id="active-chat-name" class="font-bold text-slate-900">Alex Johnson</h4>
+                                                <p class="text-xs text-emerald-500 font-bold" data-i18n="online_status">Online</p>
+                                            </div>
+                                        </div>
+                                        <div class="flex space-x-2">
+                                            <button onclick="startVideoCall()" class="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><i data-lucide="video" size="20"></i></button>
+                                            <button class="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"><i data-lucide="calendar" size="20"></i></button>
+                                        </div>
+                                    </div>
+                                    <!-- Message Area -->
+                                    <div id="message-area" class="flex-grow overflow-y-auto p-8 space-y-4 flex flex-col">
+                                        <!-- Messages will appear here -->
+                                    </div>
+                                    <!-- Input Area -->
+                                    <div class="p-6 bg-white border-t border-slate-100">
+                                        <div class="flex items-center space-x-4 bg-slate-50 p-2 pl-6 rounded-[2rem] border border-slate-100 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                                            <input type="text" id="chat-input" placeholder="Type a message..." class="bg-transparent flex-grow outline-none text-sm py-2" data-i18n-placeholder="chat_placeholder">
+                                            <button onclick="sendMessage()" class="bg-indigo-600 text-white p-3 rounded-full hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">
+                                                <i data-lucide="send" size="18"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Wallet View -->
+                    <div id="wallet-view" class="view-section view-hidden max-w-4xl mx-auto">
+                        <div class="grid md:grid-cols-3 gap-8 mb-12">
+                            <!-- Balance Card -->
+                            <div class="md:col-span-2 bg-indigo-600 rounded-[3rem] p-10 text-white shadow-2xl relative overflow-hidden">
+                                <div class="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full translate-x-24 -translate-y-24"></div>
+                                <div class="relative z-10">
+                                    <div class="flex items-center space-x-3 mb-8">
+                                        <div class="w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center">
+                                            <i data-lucide="wallet" size="24"></i>
+                                        </div>
+                                        <h3 class="text-xl font-bold opacity-80" data-i18n="wallet_title">My Wallet</h3>
+                                    </div>
+                                    <p class="text-sm font-bold opacity-60 uppercase tracking-widest mb-2" data-i18n="wallet_balance">Available Balance</p>
+                                    <div class="flex items-baseline space-x-3">
+                                        <h2 class="text-7xl font-black" id="wallet-balance-display">1.50</h2>
+                                        <span class="text-2xl font-bold opacity-80" data-i18n="credits_label">Credits</span>
+                                    </div>
+                                    <div class="mt-12 flex space-x-4">
+                                        <button onclick="simulateEarnCredits()" class="bg-white text-indigo-600 px-8 py-4 rounded-2xl font-bold hover:bg-indigo-50 transition-all flex items-center shadow-lg">
+                                            <i data-lucide="plus-circle" size="18" class="mr-2"></i> <span data-i18n="earn_btn">Earn Credits</span>
+                                        </button>
+                                        <button class="bg-indigo-500/30 backdrop-blur-md border border-indigo-400/30 text-white px-8 py-4 rounded-2xl font-bold hover:bg-indigo-500/50 transition-all flex items-center">
+                                            <i data-lucide="shopping-bag" size="18" class="mr-2"></i> <span data-i18n="buy_btn">Buy Credits</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Stats Card -->
+                            <div class="bg-white rounded-[3rem] border border-slate-100 p-8 shadow-sm">
+                                <h4 class="text-lg font-black mb-6" data-i18n="wallet_stats">Wallet Stats</h4>
+                                <div class="space-y-6">
+                                    <div class="p-4 rounded-3xl bg-emerald-50 border border-emerald-100">
+                                        <p class="text-xs font-bold text-emerald-600 uppercase mb-1">Total Earned</p>
+                                        <p class="text-2xl font-black text-emerald-700">5.50 <span class="text-sm">Credits</span></p>
+                                    </div>
+                                    <div class="p-4 rounded-3xl bg-rose-50 border border-rose-100">
+                                        <p class="text-xs font-bold text-rose-600 uppercase mb-1">Total Spent</p>
+                                        <p class="text-2xl font-black text-rose-700">4.00 <span class="text-sm">Credits</span></p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Transaction History -->
+                        <div class="bg-white rounded-[3rem] border border-slate-100 p-10 shadow-sm">
+                            <div class="flex justify-between items-center mb-8">
+                                <h3 class="text-2xl font-black" data-i18n="history_title">Transaction History</h3>
+                                <button class="text-indigo-600 font-bold flex items-center text-sm hover:underline">
+                                    <span data-i18n="view_all_history">View All</span> <i data-lucide="chevron-right" size="16" class="ml-1"></i>
+                                </button>
+                            </div>
+                            <div class="overflow-hidden">
+                                <table class="w-full text-left">
+                                    <thead>
+                                        <tr class="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-50">
+                                            <th class="pb-4">Description</th>
+                                            <th class="pb-4">Date</th>
+                                            <th class="pb-4 text-right">Amount</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="transaction-list">
+                                        <!-- Transactions will be injected here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        // User State
+        let currentUser = {
+            name: 'Azamat Ismatov',
+            email: '',
+            bio: 'Passionate about building intuitive digital products. I love sharing my UI/UX knowledge and want to learn Python to automate my workflows.',
+            offering: ['UI/UX', 'Figma'],
+            learning: ['Python', 'Node.js'],
+            credits: 1.50,
+            transactions: [
+                { id: 1, type: 'earned', amount: 1.0, description: 'Taught Figma to Alex', date: '2026-04-10' },
+                { id: 2, type: 'spent', amount: 0.5, description: 'Learned Python from Malika', date: '2026-04-12' }
+            ]
+        };
+
+        const ALL_SKILLS = [
+            'Programming', 'UI/UX', 'Graphic Design', 'Python', 'React', 'Node.js', 
+            'Marketing', 'SEO', 'English', 'Russian', 'Photography', 'Video Editing', 
+            'Public Speaking', 'Business Strategy', 'Flutter', 'Data Science'
+        ];
+
+        const CITIES = ['Tashkent', 'Samarkand', 'Bukhara', 'Andijan', 'Namangan', 'Fergana', 'Nukus'];
+
+        const FAKE_EXPERTS = [
+            { name: "Alex Johnson", city: "Tashkent", skill: "Python", rating: "4.9", match: "98", img: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500" },
+            { name: "Malika Karimova", city: "Samarkand", skill: "Graphic Design", rating: "5.0", match: "92", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500" },
+            { name: "Rustam Aliev", city: "Bukhara", skill: "SEO", rating: "4.7", match: "85", img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500" },
+            { name: "Elena Petrova", city: "Tashkent", skill: "English", rating: "4.8", match: "95", img: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=500" },
+            { name: "Jasur Ahmedov", city: "Andijan", skill: "React", rating: "4.9", match: "90", img: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=500" },
+            { name: "Nigora Usmanova", city: "Namangan", skill: "Photography", rating: "4.6", match: "88", img: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500" },
+            { name: "Dmitry Volkov", city: "Fergana", skill: "Node.js", rating: "4.5", match: "82", img: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500" },
+            { name: "Zuhra Solieva", city: "Nukus", skill: "Marketing", rating: "4.7", match: "87", img: "https://images.unsplash.com/photo-1517841905240-472988babdf9?w=500" },
+            { name: "Otabek Ganiev", city: "Tashkent", skill: "Flutter", rating: "4.9", match: "93", img: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=500" },
+            { name: "Kamola Juraeva", city: "Samarkand", skill: "UI/UX", rating: "5.0", match: "96", img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500" },
+            { name: "Bekzod Rahimov", city: "Bukhara", skill: "Data Science", rating: "4.4", match: "80", img: "https://images.unsplash.com/photo-1552058544-f2b08422138a?w=500" },
+            { name: "Sardor Mirzaev", city: "Andijan", skill: "Business Strategy", rating: "4.8", match: "89", img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=500" },
+            { name: "Madina Saidova", city: "Tashkent", skill: "Video Editing", rating: "4.7", match: "91", img: "https://images.unsplash.com/photo-1567532939604-b6c5b0ad2e01?w=500" },
+            { name: "Timur Isaev", city: "Namangan", skill: "Programming", rating: "4.6", match: "84", img: "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=500" },
+            { name: "Aziza Karimova", city: "Fergana", skill: "Public Speaking", rating: "4.9", match: "94", img: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=500" },
+            { name: "Sherzod Alimov", city: "Tashkent", skill: "Python", rating: "4.5", match: "81", img: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=500" },
+            { name: "Gulnora Nazarova", city: "Samarkand", skill: "Russian", rating: "4.8", match: "92", img: "https://images.unsplash.com/photo-1544717297-fa95b3ee51f3?w=500" },
+            { name: "Farhod Ergashev", city: "Bukhara", skill: "React", rating: "4.7", match: "86", img: "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=500" },
+            { name: "Munira Tosheva", city: "Nukus", skill: "Graphic Design", rating: "4.9", match: "90", img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=500" },
+            { name: "Shavkat Norov", city: "Tashkent", skill: "Node.js", rating: "4.6", match: "83", img: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=500" },
+            { name: "Laylo Sharipova", city: "Fergana", skill: "Marketing", rating: "4.8", match: "95", img: "https://images.unsplash.com/photo-1567532939604-b6c5b0ad2e01?w=500" },
+            { name: "Abbos Umarov", city: "Namangan", skill: "SEO", rating: "4.5", match: "82", img: "https://images.unsplash.com/photo-1552058544-f2b08422138a?w=500" },
+            { name: "Sevara Karimova", city: "Andijan", skill: "UI/UX", rating: "5.0", match: "97", img: "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=500" },
+            { name: "Anvar Kasimov", city: "Tashkent", skill: "Flutter", rating: "4.7", match: "88", img: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=500" },
+            { name: "Dilshod Mirzaev", city: "Samarkand", skill: "Data Science", rating: "4.4", match: "79", img: "https://images.unsplash.com/photo-1501196354995-cbb51c65aaea?w=500" },
+            { name: "Feruza Adilova", city: "Bukhara", skill: "Photography", rating: "4.9", match: "93", img: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=500" },
+            { name: "Bobur Sultanov", city: "Tashkent", skill: "Business Strategy", rating: "4.8", match: "91", img: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=500" },
+            { name: "Umida Hakimova", city: "Fergana", skill: "English", rating: "4.7", match: "86", img: "https://images.unsplash.com/photo-1544717297-fa95b3ee51f3?w=500" },
+            { name: "Mansur Karimov", city: "Namangan", skill: "Video Editing", rating: "4.6", match: "84", img: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=500" },
+            { name: "Shahlo Azimova", city: "Tashkent", skill: "Public Speaking", rating: "5.0", match: "99", img: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=500" }
+        ];
+
+        function renderExperts() {
+            const grid = document.getElementById('expert-grid');
+            grid.innerHTML = FAKE_EXPERTS.map(exp => `
+                <div class="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden group hover:shadow-2xl transition-all duration-500 animate-fade">
+                    <div class="h-56 relative">
+                        <img src="${exp.img}" class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700">
+                        <div class="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center space-x-1 shadow-sm">
+                            <i data-lucide="zap" class="text-yellow-500 fill-current" size="14"></i>
+                            <span class="text-xs font-extrabold text-indigo-600">${exp.match}% Match</span>
+                        </div>
+                    </div>
+                    <div class="p-8">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="text-2xl font-bold">${exp.name}</h4>
+                            <div class="bg-yellow-50 text-yellow-700 px-2 py-1 rounded-lg text-sm font-bold flex items-center">
+                                <i data-lucide="star" size="14" class="mr-1 fill-current"></i> ${exp.rating}
+                            </div>
+                        </div>
+                        <p class="text-slate-400 text-sm mb-6 flex items-center"><i data-lucide="map-pin" size="14" class="mr-1"></i> ${exp.city}</p>
+                        <div class="space-y-4 mb-8">
+                            <div>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Teaches</p>
+                                <div class="flex flex-wrap gap-2"><span class="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold border border-emerald-100">${exp.skill}</span></div>
+                            </div>
+                        </div>
+                        <button onclick="proposeSwap('${exp.name}')" class="w-full bg-indigo-600 text-white py-4 rounded-2xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all">Propose Skill Swap</button>
+                    </div>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+
+        // Auth & Onboarding Logic
+        function toggleAuthModal(type) {
+            const modal = document.getElementById('auth-modal');
+            modal.classList.toggle('hidden');
+            if(type === 'login') {
+                document.getElementById('login-form').classList.remove('hidden');
+                document.getElementById('register-form').classList.add('hidden');
+            } else if(type === 'register') {
+                document.getElementById('login-form').classList.add('hidden');
+                document.getElementById('register-form').classList.remove('hidden');
+            }
+        }
+
+        function toggleAuthType() {
+            document.getElementById('login-form').classList.toggle('hidden');
+            document.getElementById('register-form').classList.toggle('hidden');
+        }
+
+        function handleLogin(type) {
+            if(type === 'register') {
+                currentUser.name = document.getElementById('reg-name').value || 'New User';
+                currentUser.email = document.getElementById('reg-email').value;
+                toggleAuthModal();
+                startOnboarding();
+            } else {
+                toggleAuthModal();
+                showDashboard();
+            }
+        }
+
+        function startOnboarding() {
+            document.getElementById('onboarding-modal').classList.remove('hidden');
+            renderOnboardingSkills('offer-skills-list', 'offering');
+            renderOnboardingSkills('want-skills-list', 'learning');
+        }
+
+        function renderOnboardingSkills(containerId, listKey) {
+            const container = document.getElementById(containerId);
+            const skillsHtml = ALL_SKILLS.map(skill => `
+                <div class="skill-chip border-2 border-slate-100 px-5 py-2.5 rounded-2xl font-bold text-sm ${currentUser[listKey].includes(skill) ? 'selected' : ''}" 
+                     onclick="toggleSkillSelection(this, '${skill}', '${listKey}')">
+                    ${skill}
+                </div>
+            `).join('');
+            
+            // Add custom "add+" button
+            const addButtonHtml = `
+                <div class="skill-chip border-2 border-emerald-100 bg-emerald-50 text-emerald-600 px-5 py-2.5 rounded-2xl font-bold text-sm hover:bg-emerald-100 transition-all flex items-center" 
+                     onclick="addNewCustomSkill('${containerId}', '${listKey}')">
+                    <i data-lucide="plus" size="14" class="mr-1"></i> add+
+                </div>
+            `;
+            
+            container.innerHTML = skillsHtml + addButtonHtml;
+            lucide.createIcons();
+        }
+
+        function addNewCustomSkill(containerId, listKey) {
+            const newSkill = prompt("Enter a new skill you want to add:");
+            if (newSkill && newSkill.trim() !== "") {
+                const skillName = newSkill.trim();
+                if (!ALL_SKILLS.includes(skillName)) {
+                    ALL_SKILLS.push(skillName);
+                }
+                if (!currentUser[listKey].includes(skillName)) {
+                    currentUser[listKey].push(skillName);
+                }
+                renderOnboardingSkills(containerId, listKey);
+            }
+        }
+
+        function toggleSkillSelection(el, skill, listKey) {
+            if(currentUser[listKey].includes(skill)) {
+                currentUser[listKey] = currentUser[listKey].filter(s => s !== skill);
+                el.classList.remove('selected');
+            } else {
+                currentUser[listKey].push(skill);
+                el.classList.add('selected');
+            }
+        }
+
+        function nextOnboardingStep(step) {
+            document.getElementById('onboarding-step-1').classList.toggle('hidden', step !== 1);
+            document.getElementById('onboarding-step-2').classList.toggle('hidden', step !== 2);
+        }
+
+        function finishOnboarding() {
+            document.getElementById('onboarding-modal').classList.add('hidden');
+            showDashboard();
+        }
+
+        function showDashboard() {
+            document.getElementById('landing-page').classList.add('hidden');
+            document.getElementById('landing-nav').classList.add('hidden');
+            document.getElementById('app-dashboard').classList.remove('hidden');
+            updateProfileUI();
+            renderExperts(); // Add this line to render fake experts
+            lucide.createIcons();
+        }
+
+        // Profile Logic
+        function changeProfilePic() {
+            const newUrl = prompt("Enter a new image URL for your profile picture:", currentUser.img || "https://i.pravatar.cc/150?u=me");
+            if (newUrl && newUrl.trim() !== "") {
+                currentUser.img = newUrl.trim();
+                document.getElementById('profile-img').src = currentUser.img;
+                document.getElementById('user-avatar-top').src = currentUser.img;
+                alert("Profile picture updated!");
+            }
+        }
+
+        function updateProfileUI() {
+            document.getElementById('profile-name-display').innerText = currentUser.name;
+            document.getElementById('profile-bio-display').innerText = currentUser.bio;
+            if (currentUser.img) {
+                document.getElementById('profile-img').src = currentUser.img;
+                document.getElementById('user-avatar-top').src = currentUser.img;
+            }
+            
+            const teaching = document.getElementById('profile-teaching-skills');
+            teaching.innerHTML = currentUser.offering.map(s => `<span class="bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full text-xs font-bold">${s}</span>`).join('');
+            
+            const learning = document.getElementById('profile-learning-skills');
+            learning.innerHTML = currentUser.learning.map(s => `<span class="bg-sky-50 text-sky-700 px-3 py-1 rounded-full text-xs font-bold">${s}</span>`).join('');
+        }
+
+        function toggleEditProfileModal() {
+            const modal = document.getElementById('edit-profile-modal');
+            modal.classList.toggle('hidden');
+            if(!modal.classList.contains('hidden')) {
+                document.getElementById('edit-name').value = currentUser.name;
+                document.getElementById('edit-bio').value = currentUser.bio;
+            }
+        }
+
+        function saveProfile() {
+            currentUser.name = document.getElementById('edit-name').value;
+            currentUser.bio = document.getElementById('edit-bio').value;
+            updateProfileUI();
+            toggleEditProfileModal();
+        }
+
+        // Dashboard Logic
+        let activeChat = null;
+        let messages = {}; // Store messages for each expert: { 'Alex Johnson': [...] }
+
+        function switchTab(tab) {
+            const views = ['home', 'chat', 'wallet', 'profile'];
+            views.forEach(v => {
+                const view = document.getElementById(`${v}-view`);
+                const btn = document.getElementById(`btn-${v}`);
+                
+                if (v === tab) {
+                    view.classList.remove('view-hidden');
+                    view.classList.add('view-visible');
+                    btn.classList.add('tab-active', 'text-indigo-600');
+                    btn.classList.remove('text-slate-400');
+                } else {
+                    view.classList.remove('view-visible');
+                    view.classList.add('view-hidden');
+                    btn.classList.remove('tab-active', 'text-indigo-600');
+                    btn.classList.add('text-slate-400');
+                }
+            });
+            
+            if(tab === 'profile') updateProfileUI();
+            if(tab === 'wallet') updateWalletUI();
+            
+            lucide.createIcons();
+        }
+
+        // Wallet Logic
+        function updateWalletUI() {
+            document.getElementById('wallet-balance-display').innerText = currentUser.credits.toFixed(2);
+            // Also update top bar balance
+            const topBalance = document.querySelector('#home-view header p.text-indigo-600');
+            if(topBalance) topBalance.innerText = `${currentUser.credits.toFixed(2)} Credits`;
+
+            const list = document.getElementById('transaction-list');
+            list.innerHTML = currentUser.transactions.map(t => `
+                <tr class="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
+                    <td class="py-5">
+                        <div class="flex items-center">
+                            <div class="w-10 h-10 ${t.type === 'earned' ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'} rounded-xl flex items-center justify-center mr-4">
+                                <i data-lucide="${t.type === 'earned' ? 'trending-up' : 'trending-down'}" size="18"></i>
+                            </div>
+                            <span class="font-bold text-slate-700">${t.description}</span>
+                        </div>
+                    </td>
+                    <td class="py-5 text-sm font-bold text-slate-400">${t.date}</td>
+                    <td class="py-5 text-right font-black ${t.type === 'earned' ? 'text-emerald-600' : 'text-rose-600'}">
+                        ${t.type === 'earned' ? '+' : '-'}${t.amount.toFixed(2)}
+                    </td>
+                </tr>
+            `).reverse().join(''); // Show newest first
+            lucide.createIcons();
+        }
+
+        function simulateEarnCredits() {
+            const amount = 1.0;
+            currentUser.credits += amount;
+            currentUser.transactions.push({
+                id: currentUser.transactions.length + 1,
+                type: 'earned',
+                amount: amount,
+                description: 'Completed a skill swap session',
+                date: new Date().toISOString().split('T')[0]
+            });
+            updateWalletUI();
+            alert("Success! You've earned 1.00 credit for your teaching session.");
+        }
+
+        // Messaging Logic
+        function startVideoCall() {
+            if(!activeChat) return;
+            const expert = FAKE_EXPERTS.find(e => e.name === activeChat) || { name: activeChat, img: 'https://i.pravatar.cc/150?u=' + activeChat };
+            
+            document.getElementById('call-name').innerText = activeChat;
+            document.getElementById('call-avatar').innerText = activeChat[0];
+            document.getElementById('call-avatar').innerHTML = expert.img ? `<img src="${expert.img}" class="w-full h-full object-cover">` : activeChat[0];
+            document.getElementById('call-bg').src = expert.img || '';
+            document.getElementById('call-status').innerText = "Calling...";
+            
+            document.getElementById('video-call-modal').classList.remove('hidden');
+            lucide.createIcons();
+
+            // Simulate answering
+            setTimeout(() => {
+                document.getElementById('call-status').innerText = "00:01";
+                document.getElementById('call-status').classList.remove('animate-pulse');
+                document.getElementById('call-status').classList.add('text-emerald-400');
+                
+                // Start timer
+                let sec = 1;
+                window.callTimer = setInterval(() => {
+                    sec++;
+                    const m = Math.floor(sec/60);
+                    const s = sec%60;
+                    document.getElementById('call-status').innerText = `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+                }, 1000);
+            }, 3000);
+        }
+
+        function endVideoCall() {
+            clearInterval(window.callTimer);
+            document.getElementById('video-call-modal').classList.add('hidden');
+        }
+
+        function proposeSwap(name) {
+            if(!messages[name]) {
+                messages[name] = [
+                    { text: `Hi ${name}! I saw your profile and I'm interested in a skill swap. I can teach you ${currentUser.offering[0]}!`, sent: true, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }
+                ];
+            }
+            openChat(name);
+            renderChatList();
+            switchTab('chat');
+        }
+
+        // Language Support
+        const translations = {
+            en: {
+                nav_explore: "Explore",
+                nav_how: "How it Works",
+                nav_contact: "Contact",
+                btn_login: "Login",
+                btn_signup: "Sign Up Free",
+                hero_title: "Teach Skills. <br><span class=\"text-indigo-600\">Earn Credits.</span> <br>Learn Free.",
+                hero_desc: "The modern way to upgrade your career without spending a dime. Swap expertise with people worldwide using our credit system.",
+                get_started: "Start Your Journey",
+                how_title: "How SkillSwap Works",
+                how_subtitle: "A detailed guide to your first successful knowledge exchange.",
+                step1_title: "1. Personalize Profile",
+                step1_desc: "Sign up and list the specific skills you can teach (e.g., Python, Piano) and what you want to learn. Add a bio to build trust within the community.",
+                step2_title: "2. Smart Matching",
+                step2_desc: "Our algorithm calculates compatibility scores based on your needs. Browse 30+ experts, check their ratings, and send a swap proposal via real-time chat.",
+                step3_title: "3. Swap & Learn",
+                step3_desc: "Schedule a video session. For every 60 minutes you teach, you earn 1 credit. Spend your credits to learn any new skill from the global network.",
+                explore_title: "Explore Skills",
+                explore_subtitle: "From Programming to Public Speaking, find anything you want to learn.",
+                view_all: "View All 50+ Skills",
+                contact_title: "Get in Touch",
+                contact_subtitle: "Have questions? Our team is here to help you start your skill swap journey today.",
+                contact_loc: "Tashkent IT Park, Uzbekistan",
+                form_name: "Your Name",
+                form_email: "Email Address",
+                form_msg: "Message",
+                btn_send: "Send Message",
+                wallet_title: "My Wallet",
+                wallet_balance: "Available Balance",
+                credits_label: "Credits",
+                earn_btn: "Earn Credits",
+                buy_btn: "Buy Credits",
+                wallet_stats: "Wallet Stats",
+                history_title: "Transaction History",
+                view_all_history: "View All",
+                recommended_title: "Recommended Experts",
+                recommended_subtitle: "Hand-picked matches for your interests.",
+                balance_label: "Balance",
+                edit_profile: "Edit Profile",
+                about_me: "About Me",
+                teaching_label: "Teaching",
+                learning_label: "Learning",
+                skill_stats: "Skill Stats",
+                sessions_done: "Sessions Completed",
+                avg_rating: "Average Rating",
+                resp_rate: "Response Rate",
+                messages_title: "Messages",
+                no_chats: "No chats active",
+                select_contact: "Select a contact to start swapping",
+                online_status: "Online",
+                chat_placeholder: "Type a message..."
+            },
+            ru: {
+                nav_explore: "Обзор",
+                nav_how: "Как это работает",
+                nav_contact: "Контакты",
+                btn_login: "Войти",
+                btn_signup: "Регистрация",
+                hero_title: "Обучайте. <br><span class=\"text-indigo-600\">Получайте баллы.</span> <br>Учитесь бесплатно.",
+                hero_desc: "Современный способ прокачать карьеру без вложений. Обменивайтесь опытом с людьми по всему миру через нашу систему кредитов.",
+                get_started: "Начать путь",
+                how_title: "Как работает SkillSwap",
+                how_subtitle: "Подробное руководство по вашему первому успешному обмену знаниями.",
+                step1_title: "1. Создайте профиль",
+                step1_desc: "Зарегистрируйтесь и укажите навыки, которым можете обучить (напр. Python, Пианино) и то, что хотите выучить.",
+                step2_title: "2. Умный подбор",
+                step2_desc: "Наш алгоритм подберет партнеров по интересам. Просматривайте 30+ экспертов и отправляйте предложения в чате.",
+                step3_title: "3. Обмен и обучение",
+                step3_desc: "Проводите видео-встречи. За каждые 60 минут обучения вы получаете 1 балл. Тратьте баллы на обучение новым навыкам.",
+                explore_title: "Все навыки",
+                explore_subtitle: "От программирования до ораторского искусства — найдите всё, что хотите выучить.",
+                view_all: "Все 50+ навыков",
+                contact_title: "Связаться с нами",
+                contact_subtitle: "Есть вопросы? Наша команда поможет вам начать путь в SkillSwap уже сегодня.",
+                contact_loc: "Ташкент, IT Park, Узбекистан",
+                form_name: "Ваше имя",
+                form_email: "Email адрес",
+                form_msg: "Сообщение",
+                btn_send: "Отправить",
+                wallet_title: "Мой кошелек",
+                wallet_balance: "Доступный баланс",
+                credits_label: "Баллы",
+                earn_btn: "Заработать",
+                buy_btn: "Купить",
+                wallet_stats: "Статистика",
+                history_title: "История транзакций",
+                view_all_history: "Все",
+                recommended_title: "Рекомендованные эксперты",
+                recommended_subtitle: "Подобранные партнеры для ваших интересов.",
+                balance_label: "Баланс",
+                edit_profile: "Редактировать профиль",
+                about_me: "Обо мне",
+                teaching_label: "Преподаю",
+                learning_label: "Изучаю",
+                skill_stats: "Статистика навыков",
+                sessions_done: "Сессий завершено",
+                avg_rating: "Средний рейтинг",
+                resp_rate: "Частота ответов",
+                messages_title: "Сообщения",
+                no_chats: "Нет активных чатов",
+                select_contact: "Выберите контакт для начала общения",
+                online_status: "В сети",
+                chat_placeholder: "Введите сообщение..."
+            },
+            uz: {
+                nav_explore: "Ko'rish",
+                nav_how: "Qanday ishlaydi",
+                nav_contact: "Aloqa",
+                btn_login: "Kirish",
+                btn_signup: "Ro'yxatdan o'tish",
+                hero_title: "O'rgating. <br><span class=\"text-indigo-600\">Kredit yig'ing.</span> <br>Bepul o'rganing.",
+                hero_desc: "Sarmoyasiz martaba oshirishning zamonaviy usuli. Kredit tizimimiz orqali butun dunyodagi odamlar bilan tajriba almashing.",
+                get_started: "Sayohatni boshlash",
+                how_title: "SkillSwap qanday ishlaydi",
+                how_subtitle: "Birinchi muvaffaqiyatli bilim almashinuvingiz uchun batafsil qo'llanma.",
+                step1_title: "1. Profilni yaratish",
+                step1_desc: "Ro'yxatdan o'ting va o'rgata oladigan (masalan, Python, Piano) va o'rganmoqchi bo'lgan bilimlaringizni kiriting.",
+                step2_title: "2. Aqlli qidiruv",
+                step2_desc: "Bizning algoritmimiz sizga mos sheriklarni topadi. 30 dan ortiq ekspertlarni ko'ring va chat orqali taklif yuboring.",
+                step3_title: "3. Almashish va o'rganish",
+                step3_desc: "Video darslar o'tkazing. Har 60 daqiqalik dars uchun 1 kredit oling. Kreditlarni yangi bilimlar o'rganishga sarflang.",
+                explore_title: "Bilimlarni kashf eting",
+                explore_subtitle: "Dasturlashdan tortib notiqlik san'atigacha, o'rganmoqchi bo'lgan hamma narsangizni toping.",
+                view_all: "Barcha 50+ bilimlar",
+                contact_title: "Biz bilan bog'laning",
+                contact_subtitle: "Savollaringiz bormi? Bizning jamoamiz sizga yordam berishga tayyor.",
+                contact_loc: "Toshkent IT Park, O'zbekiston",
+                form_name: "Ismingiz",
+                form_email: "Email manzilingiz",
+                form_msg: "Xabar",
+                btn_send: "Yuborish",
+                wallet_title: "Mening hamyonim",
+                wallet_balance: "Mavjud balans",
+                credits_label: "Kreditlar",
+                earn_btn: "Kredit olish",
+                buy_btn: "Sotib olish",
+                wallet_stats: "Statistika",
+                history_title: "O'tkazmalar tarixi",
+                view_all_history: "Barchasi",
+                recommended_title: "Tavsiya etilgan ekspertlar",
+                recommended_subtitle: "Sizning qiziqishlaringizga mos sheriklar.",
+                balance_label: "Balans",
+                edit_profile: "Profilni tahrirlash",
+                about_me: "Men haqimda",
+                teaching_label: "O'rgataman",
+                learning_label: "O'rganaman",
+                skill_stats: "Bilim statistikasi",
+                sessions_done: "Tugallangan darslar",
+                avg_rating: "O'rtacha reyting",
+                resp_rate: "Javob berish darajasi",
+                messages_title: "Xabarlar",
+                no_chats: "Faol chatlar yo'q",
+                select_contact: "Suhbatni boshlash uchun kontaktni tanlang",
+                online_status: "Onlayn",
+                chat_placeholder: "Xabar yozing..."
+            }
+        };
+
+        function setLanguage(lang) {
+            document.getElementById('current-lang').innerText = lang.toUpperCase();
+            
+            // Translate text content
+            const elements = document.querySelectorAll('[data-i18n]');
+            elements.forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (translations[lang][key]) {
+                    el.innerHTML = translations[lang][key];
+                }
+            });
+
+            // Translate placeholders
+            const placeholders = document.querySelectorAll('[data-i18n-placeholder]');
+            placeholders.forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                if (translations[lang][key]) {
+                    el.placeholder = translations[lang][key];
+                }
+            });
+        }
+
+        // Initialize Skill Explore Grid
+        function renderSkillExplore() {
+            const grid = document.getElementById('skill-explore-grid');
+            if(!grid) return;
+            grid.innerHTML = ALL_SKILLS.slice(0, 12).map(skill => `
+                <div class="bg-white p-6 rounded-3xl border border-slate-100 text-center hover:shadow-xl hover:border-indigo-100 transition-all cursor-pointer group">
+                    <div class="w-12 h-12 bg-slate-50 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:bg-indigo-50 transition-all text-indigo-600">
+                        <i data-lucide="zap" size="20"></i>
+                    </div>
+                    <p class="font-bold text-sm">${skill}</p>
+                </div>
+            `).join('');
+            lucide.createIcons();
+        }
+        
+        renderSkillExplore();
+
+        function openChat(name) {
+            activeChat = name;
+            document.getElementById('chat-empty').classList.add('hidden');
+            document.getElementById('chat-active').classList.remove('hidden');
+            document.getElementById('active-chat-name').innerText = name;
+            document.getElementById('active-chat-avatar').innerText = name[0];
+            
+            renderMessages();
+            renderChatList();
+        }
+
+        function renderChatList() {
+            const chatList = document.getElementById('chat-list');
+            const chatNames = Object.keys(messages);
+            
+            if(chatNames.length === 0) {
+                chatList.innerHTML = `
+                    <div class="p-20 text-center opacity-50">
+                        <i data-lucide="message-square" size="48" class="mx-auto mb-4"></i>
+                        <p class="font-bold">No chats active</p>
+                    </div>
+                `;
+            } else {
+                chatList.innerHTML = chatNames.map(name => `
+                    <div onclick="openChat('${name}')" class="p-4 rounded-2xl flex items-center space-x-4 cursor-pointer transition-all ${activeChat === name ? 'bg-indigo-50 border border-indigo-100' : 'hover:bg-slate-50'}">
+                        <div class="w-12 h-12 bg-indigo-200 rounded-xl flex items-center justify-center font-bold text-indigo-700">${name[0]}</div>
+                        <div class="flex-grow overflow-hidden">
+                            <p class="font-bold text-slate-900 truncate">${name}</p>
+                            <p class="text-xs text-slate-400 truncate">${messages[name][messages[name].length-1].text}</p>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            lucide.createIcons();
+        }
+
+        function renderMessages() {
+            const area = document.getElementById('message-area');
+            if(!activeChat || !messages[activeChat]) return;
+            
+            area.innerHTML = messages[activeChat].map(msg => `
+                <div class="flex ${msg.sent ? 'justify-end' : 'justify-start'} animate-fade">
+                    <div class="max-w-[80%] ${msg.sent ? 'bg-indigo-600 text-white rounded-2xl rounded-tr-none' : 'bg-white border border-slate-100 text-slate-800 rounded-2xl rounded-tl-none'} p-4 shadow-sm">
+                        <p class="text-sm">${msg.text}</p>
+                        <p class="text-[10px] mt-1 opacity-70 text-right">${msg.time}</p>
+                    </div>
+                </div>
+            `).join('');
+            
+            area.scrollTop = area.scrollHeight;
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if(!text || !activeChat) return;
+            
+            messages[activeChat].push({
+                text: text,
+                sent: true,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            });
+            
+            input.value = '';
+            renderMessages();
+            renderChatList();
+
+            // Fake auto-reply
+            setTimeout(() => {
+                if(activeChat === activeChat) {
+                    messages[activeChat].push({
+                        text: "That sounds great! I'd love to swap skills with you. When are you free for a session?",
+                        sent: false,
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    });
+                    renderMessages();
+                    renderChatList();
+                }
+            }, 1500);
+        }
+
+        // Add Enter key support for chat
+        document.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter' && document.activeElement.id === 'chat-input') {
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>
